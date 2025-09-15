@@ -5,6 +5,9 @@ const mongoose = require("mongoose");
 const userRoutes = require("./routes/users");
 const folderRoutes = require("./routes/folders");
 const fileRoutes = require("./routes/files");
+const searchRoutes = require("./routes/search");
+const trashRoutes = require("./routes/trash");
+
 
 const app = express();
 app.use(express.json());
@@ -13,6 +16,8 @@ app.use(express.json());
 app.use("/api/users", userRoutes);
 app.use("/api/folders", folderRoutes);
 app.use("/api/files", fileRoutes);
+app.use("/api/search", searchRoutes);
+app.use("/api/trash", trashRoutes);
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => {

@@ -87,4 +87,36 @@ router.get("/", requireAuth, async (req, res) => {
   }
 });
 
+
+router.post("/:id/share", requireAuth, async (req, res) => {
+  try {
+    const file = await File.findOne({ _id: req.params.id, user: req.auth.userId });
+    if (!file) return res.status(404).json({ message: "File not found" });
+
+    // Generate a new shareId if not already shared
+    if (!file.shareId) file.generateShareId();
+    await file.save();
+
+    const shareLink = `${process.env.APP_URL}/share/${file.shareId}`;
+    res.json({ shareLink });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
+router.get("/share/:shareId", async (req, res) => {
+  try {
+    const file = await File.findOne({ shareId: req.params.shareId });
+    if (!file) return res.status(404).json({ message: "Invalid share link" });
+
+    res.download(file.url, file.name);  // or just return metadata
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
+
+
 module.exports = router;

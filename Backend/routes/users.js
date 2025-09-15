@@ -1,9 +1,11 @@
-const express = require('express');
+// routes/user.js
+const express = require("express");
+const requireAuth = require("../middleware/auth");
 const router = express.Router();
-const { requireAuth } = require("../middleware/authMiddleware.js");
 
-router.get('/', requireAuth , async (req,res) => {
-    try {
+// GET /api/users/profile
+router.get("/profile", requireAuth, async (req, res) => {
+  try {
     // Clerk automatically attaches user info to req.auth
     const { userId } = req.auth;
     res.json({ userId });

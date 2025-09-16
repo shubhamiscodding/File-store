@@ -1,4 +1,3 @@
-// routes/trash.js
 const express = require("express");
 const File = require("../models/File");
 const Folder = require("../models/Folder");
@@ -6,9 +5,9 @@ const requireAuth = require("../middleware/auth");
 
 const router = express.Router();
 
-/**
- * Move file/folder to trash
- */
+// ----------------------------
+// Move file/folder to trash
+// ----------------------------
 router.post("/:id", requireAuth, async (req, res) => {
   try {
     const { type } = req.body; // "file" or "folder"
@@ -27,30 +26,30 @@ router.post("/:id", requireAuth, async (req, res) => {
         { new: true }
       );
 
-      // ✅ Trash all files inside this folder
+      // Trash all files in this folder
       await File.updateMany(
-        { parentFolder: req.params.id, user: req.auth.userId },
+        { folder: req.params.id, user: req.auth.userId },
         { isTrashed: true }
       );
 
-      // ✅ Trash all subfolders (direct children)
+      // Trash all direct subfolders
       await Folder.updateMany(
         { parentFolder: req.params.id, user: req.auth.userId },
         { isTrashed: true }
       );
     }
 
-    res.json(item);
+    res.json({ message: "Item moved to trash", item });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 });
 
-/**
- * Restore file/folder
- */
-router.put("/:id", requireAuth, async (req, res) => {
+// ----------------------------
+// Restore file/folder from trash
+// ----------------------------
+router.put("/restore/:id", requireAuth, async (req, res) => {
   try {
     const { type } = req.body;
     let item;
@@ -68,29 +67,29 @@ router.put("/:id", requireAuth, async (req, res) => {
         { new: true }
       );
 
-      // ✅ Restore all files inside this folder
+      // Restore all files in folder
       await File.updateMany(
-        { parentFolder: req.params.id, user: req.auth.userId },
+        { folder: req.params.id, user: req.auth.userId },
         { isTrashed: false }
       );
 
-      // ✅ Restore all subfolders
+      // Restore all direct subfolders
       await Folder.updateMany(
         { parentFolder: req.params.id, user: req.auth.userId },
         { isTrashed: false }
       );
     }
 
-    res.json(item);
+    res.json({ message: "Item restored", item });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 });
 
-/**
- * Get all trashed items (files + folders)
- */
+// ----------------------------
+// Get all trashed items
+// ----------------------------
 router.get("/", requireAuth, async (req, res) => {
   try {
     const trashedFiles = await File.find({
@@ -110,9 +109,9 @@ router.get("/", requireAuth, async (req, res) => {
   }
 });
 
-/**
- * Permanently delete file/folder from trash
- */
+// ----------------------------
+// Permanently delete file/folder
+// ----------------------------
 router.delete("/:id", requireAuth, async (req, res) => {
   try {
     const { type } = req.body;
@@ -131,14 +130,14 @@ router.delete("/:id", requireAuth, async (req, res) => {
         isTrashed: true,
       });
 
-      // Delete all files inside this folder
+      // Delete all files inside folder
       await File.deleteMany({
-        parentFolder: req.params.id,
+        folder: req.params.id,
         user: req.auth.userId,
         isTrashed: true,
       });
 
-      // Delete all subfolders inside this folder
+      // Delete all subfolders
       await Folder.deleteMany({
         parentFolder: req.params.id,
         user: req.auth.userId,
@@ -153,39 +152,13 @@ router.delete("/:id", requireAuth, async (req, res) => {
   }
 });
 
-
-// restoring the deleted item from trash
-
-router.put("/restore-all", requireAuth, async (req, res) => {
-  try {
-    // Restore all files
-    await File.updateMany(
-      { user: req.auth.userId, isTrashed: true },
-      { isTrashed: false }
-    );
-
-    // Restore all folders
-    await Folder.updateMany(
-      { user: req.auth.userId, isTrashed: true },
-      { isTrashed: false }
-    );
-
-    res.json({ message: "All files and folders restored successfully" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-
-
-// now restoring id wise
-
+// ----------------------------
+// Restore multiple items by IDs
+// ----------------------------
 router.put("/restore", requireAuth, async (req, res) => {
   try {
     const { files = [], folders = [] } = req.body;
 
-    // Restore selected files
     if (files.length > 0) {
       await File.updateMany(
         { _id: { $in: files }, user: req.auth.userId },
@@ -193,7 +166,6 @@ router.put("/restore", requireAuth, async (req, res) => {
       );
     }
 
-    // Restore selected folders
     if (folders.length > 0) {
       await Folder.updateMany(
         { _id: { $in: folders }, user: req.auth.userId },
@@ -208,9 +180,20 @@ router.put("/restore", requireAuth, async (req, res) => {
   }
 });
 
+// ----------------------------
+// Restore all trashed items
+// ----------------------------
+router.put("/restore-all", requireAuth, async (req, res) => {
+  try {
+    await File.updateMany({ user: req.auth.userId, isTrashed: true }, { isTrashed: false });
+    await Folder.updateMany({ user: req.auth.userId, isTrashed: true }, { isTrashed: false });
 
-
-
-
+    res.json({ message: "All files and folders restored successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 
 module.exports = router;
+// ----------------------------

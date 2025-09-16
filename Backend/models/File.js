@@ -1,14 +1,20 @@
 const mongoose = require("mongoose");
 const { v4: uuidv4 } = require("uuid");
 
-const fileSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  url: { type: String, required: true },
-  folder: { type: mongoose.Schema.Types.ObjectId, ref: "Folder" },
-  user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-  shareId: { type: String, unique: true }, // unique public share link
-  isTrashed: { type: Boolean, default: false },
-}, { timestamps: true });
+const fileSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true },
+    url: { type: String, required: true },
+    folder: { type: mongoose.Schema.Types.ObjectId, ref: "Folder" },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    shareId: { type: String, unique: true }, // unique public share link
+    isTrashed: { type: Boolean, default: false },
+  },
+  { timestamps: true }
+);
+
+// ✅ Add text index for better search
+fileSchema.index({ name: "text" });
 
 // Generate shareId automatically when requested
 fileSchema.methods.generateShareId = function () {

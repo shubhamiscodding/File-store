@@ -1,51 +1,70 @@
+// routes/users.js
 const express = require("express");
-const router = express.Router();
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const User = require("../models/userschema");
+const User = require("../models/User");
 const requireAuth = require("../middleware/auth");
 
-// POST /api/users/register
+const router = express.Router();
+
+/**
+ * POST /api/users/register
+ * Add a new user to DB after Clerk registration
+ */
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, password, googleId } = req.body;
-    const existingUser = await User.findOne({ email });
+    const { name, email, clerkId, googleId } = req.body;
+
+    if (!name || !email || !clerkId) {
+      return res.status(400).json({ message: "Name, email, and clerkId are required" });
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ clerkId });
     if (existingUser) return res.status(400).json({ message: "User already exists" });
 
-    const hashedPassword = password ? await bcrypt.hash(password, 10) : undefined;
-
-    const newUser = new User({ name, email, password: hashedPassword, googleId });
+    const newUser = new User({ name, email, clerkId, googleId });
     const savedUser = await newUser.save();
+
     res.status(201).json(savedUser);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-// POST /api/users/login
+/**
+ * POST /api/users/login
+ * Optional: just fetch user from DB using clerkId
+ * Login itself is handled by Clerk
+ */
 router.post("/login", async (req, res) => {
   try {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: "User not found" });
+    const { clerkId } = req.body;
+    if (!clerkId) return res.status(400).json({ message: "clerkId is required" });
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
+    const user = await User.findOne({ clerkId });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "1d" });
-    res.json({ token, user });
+    res.json(user);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-// GET /api/users/profile
+/**
+ * GET /api/users/profile
+ * Fetch logged-in user info
+ */
 router.get("/profile", requireAuth, async (req, res) => {
   try {
-    const { userId } = req.auth;
-    const user = await User.findById(userId);
+    const clerkId = req.auth.userId; // from Clerk middleware
+
+    const user = await User.findOne({ clerkId });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
     res.json(user);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 });

@@ -4,6 +4,7 @@ import SignUpPage from "./pages/SignUpPage";
 import SignInPage from "./pages/SignInPage";
 import useSyncUser from "./hooks/useSyncUser";
 import useLoginUser from "./hooks/useLoginUser";
+import Trash from "./pages/Trash";
 
 function App() {
   useSyncUser(); // sync user to MongoDB
@@ -20,6 +21,7 @@ function App() {
           <Route path="/" element={<h1>Dashboard Page 🚀</h1>} />
           <Route path="/signup" element={<SignUpPage />} />
           <Route path="/signin" element={<SignInPage />} />
+          <Route path="/trash" element={<Trash />} />
         </Routes>
       </SignedIn>
 

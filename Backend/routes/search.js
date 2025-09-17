@@ -10,11 +10,9 @@ router.get("/", requireAuth, async (req, res) => {
     const query = req.query.query || "";
     const folderId = req.query.folderId || null;
 
-    // Base filter
-    const folderFilter = { user: req.auth.userId, isTrashed: false };
-    const fileFilter = { user: req.auth.userId, isTrashed: false };
+    const folderFilter = { user: req.user._id, isTrashed: false };
+    const fileFilter = { user: req.user._id, isTrashed: false };
 
-    // If folderId is provided, restrict search inside that folder
     if (folderId) {
       fileFilter.folder = folderId;
       folderFilter.parentFolder = folderId;
@@ -24,24 +22,30 @@ router.get("/", requireAuth, async (req, res) => {
     let files = [];
 
     if (query) {
-      // Use text search for performance
-      folders = await Folder.find({
-        ...folderFilter,
-        $text: { $search: query },
-      })
-        .sort({ createdAt: -1 }) // newest first
-        .limit(20);
+      try {
+        // Try full-text search
+        folders = await Folder.find({
+          ...folderFilter,
+          $text: { $search: query },
+        }).sort({ createdAt: -1 }).limit(20);
 
-      files = await File.find({
-        ...fileFilter,
-        $text: { $search: query },
-      })
-        .sort({ createdAt: -1 })
-        .limit(20);
-    } else {
-      // If no query, just return empty result (or latest items if you want)
-      folders = [];
-      files = [];
+        files = await File.find({
+          ...fileFilter,
+          $text: { $search: query },
+        }).sort({ createdAt: -1 }).limit(20);
+      } catch (err) {
+        console.warn("⚠️ Text search failed, falling back to regex:", err.message);
+
+        // Fallback to regex if $text index isn’t available
+        const regex = new RegExp(query, "i");
+        folders = await Folder.find({ ...folderFilter, name: regex })
+          .sort({ createdAt: -1 })
+          .limit(20);
+
+        files = await File.find({ ...fileFilter, name: regex })
+          .sort({ createdAt: -1 })
+          .limit(20);
+      }
     }
 
     res.json({ folders, files });

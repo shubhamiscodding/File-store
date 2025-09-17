@@ -1,14 +1,10 @@
-// routes/users.js
 const express = require("express");
 const User = require("../models/User");
 const requireAuth = require("../middleware/auth");
 
 const router = express.Router();
 
-/**
- * POST /api/users/register
- * Add a new user to DB after Clerk registration
- */
+// Register new user
 router.post("/register", async (req, res) => {
   try {
     const { name, email, clerkId, googleId } = req.body;
@@ -17,8 +13,8 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ message: "Name, email, and clerkId are required" });
     }
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ clerkId });
+    // Check if user already exists by clerkId OR email
+    const existingUser = await User.findOne({ $or: [{ clerkId }, { email }] });
     if (existingUser) return res.status(400).json({ message: "User already exists" });
 
     const newUser = new User({ name, email, clerkId, googleId });
@@ -31,11 +27,7 @@ router.post("/register", async (req, res) => {
   }
 });
 
-/**
- * POST /api/users/login
- * Optional: just fetch user from DB using clerkId
- * Login itself is handled by Clerk
- */
+// Login → just fetch from DB
 router.post("/login", async (req, res) => {
   try {
     const { clerkId } = req.body;
@@ -51,15 +43,10 @@ router.post("/login", async (req, res) => {
   }
 });
 
-/**
- * GET /api/users/profile
- * Fetch logged-in user info
- */
+// Get profile
 router.get("/profile", requireAuth, async (req, res) => {
   try {
-    const clerkId = req.auth.userId; // from Clerk middleware
-
-    const user = await User.findOne({ clerkId });
+    const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
     res.json(user);

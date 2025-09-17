@@ -6,7 +6,7 @@ const fileSchema = new mongoose.Schema(
     name: { type: String, required: true },
     url: { type: String, required: true },
     folder: { type: mongoose.Schema.Types.ObjectId, ref: "Folder" },
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    user: { type: String, required: true }, // ✅ Clerk userId as string
     shareId: { type: String, unique: true }, // unique public share link
     isTrashed: { type: Boolean, default: false },
   },

@@ -5,10 +5,20 @@ const requireAuth = require("../middleware/auth");
 
 const router = express.Router();
 
+// Helper for logging errors
+const logError = (location, err) => {
+  console.error(`[ERROR] ${location}:`, err.message);
+};
+
+// ----------------------------
+// Search folders and files
+// ----------------------------
 router.get("/", requireAuth, async (req, res) => {
   try {
     const query = req.query.query || "";
     const folderId = req.query.folderId || null;
+
+    console.log("Search request:", { query, folderId, userId: req.user._id });
 
     const folderFilter = { user: req.user._id, isTrashed: false };
     const fileFilter = { user: req.user._id, isTrashed: false };
@@ -27,17 +37,24 @@ router.get("/", requireAuth, async (req, res) => {
         folders = await Folder.find({
           ...folderFilter,
           $text: { $search: query },
-        }).sort({ createdAt: -1 }).limit(20);
+        })
+          .sort({ createdAt: -1 })
+          .limit(20);
 
         files = await File.find({
           ...fileFilter,
           $text: { $search: query },
-        }).sort({ createdAt: -1 }).limit(20);
+        })
+          .sort({ createdAt: -1 })
+          .limit(20);
+
+        console.log(`Full-text search found: ${folders.length} folders, ${files.length} files`);
       } catch (err) {
-        console.warn("⚠️ Text search failed, falling back to regex:", err.message);
+        console.warn("⚠️ Full-text search failed, using regex fallback:", err.message);
 
         // Fallback to regex if $text index isn’t available
         const regex = new RegExp(query, "i");
+
         folders = await Folder.find({ ...folderFilter, name: regex })
           .sort({ createdAt: -1 })
           .limit(20);
@@ -45,13 +62,15 @@ router.get("/", requireAuth, async (req, res) => {
         files = await File.find({ ...fileFilter, name: regex })
           .sort({ createdAt: -1 })
           .limit(20);
+
+        console.log(`Regex search found: ${folders.length} folders, ${files.length} files`);
       }
     }
 
     res.json({ folders, files });
   } catch (err) {
-    console.error("Search error:", err);
-    res.status(500).json({ message: "Server error" });
+    logError("Search", err);
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 });
 

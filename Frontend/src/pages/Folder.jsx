@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "@clerk/clerk-react";
 import Navbar from "../components/Nav";
 import api from "../utils/api";
 
@@ -10,17 +11,28 @@ export default function Folders() {
   const [newFolderName, setNewFolderName] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const { getToken } = useAuth(); // Clerk hook for JWT
+
+  // Fetch folders and files whenever parentId changes
   useEffect(() => {
     fetchContents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parentId]);
 
+  // Fetch folder and file contents
   const fetchContents = async () => {
     try {
       setLoading(true);
+      const token = await getToken({ template: "default" });
       const [fRes, fileRes] = await Promise.all([
-        api.get("/folders", { params: { parentId } }),
-        api.get("/files", { params: { folderId: parentId } }),
+        api.get("/folders", { 
+          params: { parentId },
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        api.get("/files", { 
+          params: { folderId: parentId },
+          headers: { Authorization: `Bearer ${token}` }
+        }),
       ]);
       setFolders(fRes.data || []);
       setFiles(fileRes.data || []);
@@ -31,11 +43,17 @@ export default function Folders() {
     }
   };
 
+  // Create new folder
   const createFolder = async (e) => {
     e.preventDefault();
     if (!newFolderName.trim()) return;
     try {
-      await api.post("/folders", { name: newFolderName.trim(), parentId });
+      const token = await getToken({ template: "default" });
+      await api.post(
+        "/folders",
+        { name: newFolderName.trim(), parentId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       setNewFolderName("");
       fetchContents();
     } catch (err) {
@@ -44,38 +62,51 @@ export default function Folders() {
     }
   };
 
+  // Open a folder
   const openFolder = (folder) => {
     setParentId(folder._id);
     setBreadcrumb((b) => [...b, { id: folder._id, name: folder.name }]);
   };
 
+  // Navigate using breadcrumb
   const goToBreadcrumb = (index) => {
     const item = breadcrumb[index];
     setBreadcrumb((prev) => prev.slice(0, index + 1));
     setParentId(item.id);
   };
 
+  // Rename a folder
   const renameFolder = async (folder) => {
     const newName = prompt("Rename folder", folder.name);
     if (!newName || newName.trim() === folder.name) return;
     try {
-      await api.put(`/folders/${folder._id}`, { name: newName.trim() });
+      const token = await getToken({ template: "default" });
+      await api.put(
+        `/folders/${folder._id}`,
+        { name: newName.trim() },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       fetchContents();
     } catch (err) {
       console.error("Rename error:", err.response?.data || err.message);
     }
   };
 
+  // Delete a folder
   const deleteFolder = async (folder) => {
     if (!confirm(`Delete folder "${folder.name}"? This may delete contents.`)) return;
     try {
-      await api.delete(`/folders/${folder._id}`);
+      const token = await getToken({ template: "default" });
+      await api.delete(`/folders/${folder._id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       fetchContents();
     } catch (err) {
       console.error("Delete error:", err.response?.data || err.message);
     }
   };
 
+  // Upload a file
   const uploadFile = async (e) => {
     const f = e.target.files[0];
     if (!f) return;
@@ -84,8 +115,12 @@ export default function Folders() {
     if (parentId) form.append("folderId", parentId);
 
     try {
+      const token = await getToken({ template: "default" });
       await api.post("/files/upload", form, {
-        headers: { "Content-Type": "multipart/form-data" },
+        headers: {
+          "Content-Type": "multipart/form-data",
+          Authorization: `Bearer ${token}`,
+        },
       });
       e.target.value = null;
       fetchContents();
@@ -95,10 +130,14 @@ export default function Folders() {
     }
   };
 
+  // Delete a file
   const deleteFile = async (file) => {
     if (!confirm(`Delete file "${file.name}"?`)) return;
     try {
-      await api.delete(`/files/${file._id}`);
+      const token = await getToken({ template: "default" });
+      await api.delete(`/files/${file._id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       fetchContents();
     } catch (err) {
       console.error("Delete file error:", err.response?.data || err.message);
@@ -146,12 +185,12 @@ export default function Folders() {
           </label>
         </div>
 
-        {loading ? <p>Loading...</p> : null}
+        {loading && <p>Loading...</p>}
 
         {/* Folders */}
         <div className="mb-6">
           <h3 className="font-semibold mb-2">Folders</h3>
-          {folders.length === 0 ? <p className="text-sm">No folders</p> : null}
+          {folders.length === 0 && <p className="text-sm">No folders</p>}
           <ul>
             {folders.map((f) => (
               <li key={f._id} className="flex items-center justify-between py-2 border-b">
@@ -162,8 +201,12 @@ export default function Folders() {
                   <span className="text-xs text-gray-500"> • {f.itemsCount ?? ""}</span>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => renameFolder(f)} className="text-sm underline">Rename</button>
-                  <button onClick={() => deleteFolder(f)} className="text-sm text-red-600">Delete</button>
+                  <button onClick={() => renameFolder(f)} className="text-sm underline">
+                    Rename
+                  </button>
+                  <button onClick={() => deleteFolder(f)} className="text-sm text-red-600">
+                    Delete
+                  </button>
                 </div>
               </li>
             ))}
@@ -173,19 +216,33 @@ export default function Folders() {
         {/* Files */}
         <div>
           <h3 className="font-semibold mb-2">Files</h3>
-          {files.length === 0 ? <p className="text-sm">No files in this folder</p> : null}
+          {files.length === 0 && <p className="text-sm">No files in this folder</p>}
           <ul>
             {files.map((file) => (
               <li key={file._id} className="flex items-center justify-between py-2 border-b">
                 <div>
-                  <a href={file.downloadUrl || `/api/files/download/${file._id}`} target="_blank" rel="noreferrer" className="underline">
+                  <a
+                    href={file.downloadUrl || `/api/files/download/${file._id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline"
+                  >
                     {file.name}
                   </a>
-                  <div className="text-xs text-gray-500">{(file.size/1024).toFixed(1)} KB</div>
+                  <div className="text-xs text-gray-500">{(file.size / 1024).toFixed(1)} KB</div>
                 </div>
                 <div className="flex gap-2">
-                  <a href={file.downloadUrl || `/api/files/download/${file._id}`} className="text-sm underline" target="_blank" rel="noreferrer">Download</a>
-                  <button onClick={() => deleteFile(file)} className="text-sm text-red-600">Delete</button>
+                  <a
+                    href={file.downloadUrl || `/api/files/download/${file._id}`}
+                    className="text-sm underline"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Download
+                  </a>
+                  <button onClick={() => deleteFile(file)} className="text-sm text-red-600">
+                    Delete
+                  </button>
                 </div>
               </li>
             ))}

@@ -4,7 +4,7 @@ const requireAuth = require("../middleware/auth");
 
 const router = express.Router();
 
-// Register new user
+// Register or update user
 router.post("/register", async (req, res) => {
   try {
     const { name, email, clerkId, googleId } = req.body;
@@ -13,16 +13,26 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ message: "Name, email, and clerkId are required" });
     }
 
-    // Check if user already exists by clerkId OR email
-    const existingUser = await User.findOne({ $or: [{ clerkId }, { email }] });
-    if (existingUser) return res.status(400).json({ message: "User already exists" });
+    // Find existing user
+    let user = await User.findOne({ $or: [{ clerkId }, { email }] });
 
+    if (user) {
+      // ✅ Update user if details changed
+      user.name = name || user.name;
+      user.email = email || user.email;
+      if (googleId) user.googleId = googleId;
+
+      await user.save();
+      return res.status(200).json({ message: "User already exists, updated", user });
+    }
+
+    // ✅ Create new user
     const newUser = new User({ name, email, clerkId, googleId });
     const savedUser = await newUser.save();
 
-    res.status(201).json(savedUser);
+    res.status(201).json({ message: "User created", user: savedUser });
   } catch (err) {
-    console.error(err);
+    console.error("Register error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -38,7 +48,7 @@ router.post("/login", async (req, res) => {
 
     res.json(user);
   } catch (err) {
-    console.error(err);
+    console.error("Login error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -51,7 +61,7 @@ router.get("/profile", requireAuth, async (req, res) => {
 
     res.json(user);
   } catch (err) {
-    console.error(err);
+    console.error("Profile error:", err);
     res.status(500).json({ message: "Server error" });
   }
 });

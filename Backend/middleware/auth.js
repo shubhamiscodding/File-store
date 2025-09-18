@@ -1,33 +1,29 @@
 // middleware/auth.js
-const { ClerkExpressRequireAuth } = require("@clerk/express");
+const admin = require("../firebaseAdmin"); // import initialized admin
 const User = require("../models/User");
 
-const requireAuth = ClerkExpressRequireAuth();
-
 module.exports = async (req, res, next) => {
-  // First apply Clerk authentication
-  requireAuth(req, res, async (err) => {
-    if (err) {
-      console.error("Clerk auth error:", err);
-      return res.status(401).json({ message: "Authentication failed" });
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ message: "No token provided" });
     }
 
-    try {
-      // Clerk userId
-      const clerkId = req.auth.userId;
+    const idToken = authHeader.split("Bearer ")[1];
 
-      // Find or create user in Mongo
-      let user = await User.findOne({ clerkId });
-      if (!user) {
-        return res.status(401).json({ message: "User not found in database" });
-      }
+    // Verify Firebase ID token
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
 
-      // Attach MongoDB user _id instead of just Clerk ID
-      req.user = user;
-      next();
-    } catch (error) {
-      console.error("Auth middleware error:", error);
-      res.status(500).json({ message: "Authentication error" });
+    // Find user in MongoDB
+    let user = await User.findOne({ firebaseUid: decodedToken.uid });
+    if (!user) {
+      return res.status(401).json({ message: "User not found in database" });
     }
-  });
+
+    req.user = user;
+    next();
+  } catch (error) {
+    console.error("Firebase auth error:", error);
+    res.status(401).json({ message: "Unauthorized" });
+  }
 };

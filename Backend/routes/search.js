@@ -4,66 +4,31 @@ const File = require("../models/File");
 const requireAuth = require("../middleware/auth");
 
 const router = express.Router();
+const logError = (location, err) => console.error(`[ERROR] ${location}:`, err.message);
 
-// Helper for logging errors
-const logError = (location, err) => {
-  console.error(`[ERROR] ${location}:`, err.message);
-};
-
-// ----------------------------
-// Search folders and files
-// ----------------------------
 router.get("/", requireAuth, async (req, res) => {
   try {
     const query = req.query.query || "";
     const folderId = req.query.folderId || null;
+    const userId = req.user._id;
 
-    console.log("Search request:", { query, folderId, userId: req.user._id });
-
-    const folderFilter = { user: req.user._id, isTrashed: false };
-    const fileFilter = { user: req.user._id, isTrashed: false };
+    const folderFilter = { user: userId, isTrashed: false };
+    const fileFilter = { user: userId, isTrashed: false };
 
     if (folderId) {
-      fileFilter.folder = folderId;
       folderFilter.parentFolder = folderId;
+      fileFilter.folder = folderId;
     }
 
-    let folders = [];
-    let files = [];
-
+    let folders = [], files = [];
     if (query) {
       try {
-        // Try full-text search
-        folders = await Folder.find({
-          ...folderFilter,
-          $text: { $search: query },
-        })
-          .sort({ createdAt: -1 })
-          .limit(20);
-
-        files = await File.find({
-          ...fileFilter,
-          $text: { $search: query },
-        })
-          .sort({ createdAt: -1 })
-          .limit(20);
-
-        console.log(`Full-text search found: ${folders.length} folders, ${files.length} files`);
-      } catch (err) {
-        console.warn("⚠️ Full-text search failed, using regex fallback:", err.message);
-
-        // Fallback to regex if $text index isn’t available
+        folders = await Folder.find({ ...folderFilter, $text: { $search: query } }).limit(20).sort({ createdAt: -1 });
+        files = await File.find({ ...fileFilter, $text: { $search: query } }).limit(20).sort({ createdAt: -1 });
+      } catch {
         const regex = new RegExp(query, "i");
-
-        folders = await Folder.find({ ...folderFilter, name: regex })
-          .sort({ createdAt: -1 })
-          .limit(20);
-
-        files = await File.find({ ...fileFilter, name: regex })
-          .sort({ createdAt: -1 })
-          .limit(20);
-
-        console.log(`Regex search found: ${folders.length} folders, ${files.length} files`);
+        folders = await Folder.find({ ...folderFilter, name: regex }).limit(20).sort({ createdAt: -1 });
+        files = await File.find({ ...fileFilter, name: regex }).limit(20).sort({ createdAt: -1 });
       }
     }
 

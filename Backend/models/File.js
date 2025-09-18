@@ -6,14 +6,14 @@ const fileSchema = new mongoose.Schema(
     name: { type: String, required: true },
     url: { type: String, required: true },
     folder: { type: mongoose.Schema.Types.ObjectId, ref: "Folder" },
-    user: { type: String, required: true }, // ✅ Clerk userId as string
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // store MongoDB user _id
     shareId: { type: String, unique: true }, // unique public share link
     isTrashed: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
 
-// ✅ Add text index for better search
+// Text index for better search
 fileSchema.index({ name: "text" });
 
 // Generate shareId automatically when requested
